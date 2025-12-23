@@ -59,23 +59,9 @@ export default function Footer() {
             </p>
           </div>
 
-          {/* Contact/Links */}
-          <div className="flex justify-center gap-4 text-xs">
-            <a
-              href="https://github.com/adamsalehuddin91/swift-disc"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[#4ecca3] hover:text-[#ffd93d] transition-colors"
-            >
-              📦 GitHub
-            </a>
-            <span className="opacity-30">|</span>
-            <a
-              href="https://swift-disc.vercel.app"
-              className="text-[#4ecca3] hover:text-[#ffd93d] transition-colors"
-            >
-              🌐 Web App
-            </a>
+          {/* Professional Tag */}
+          <div className="text-xs opacity-50">
+            <p>Professional DISC Assessment Tool</p>
           </div>
         </div>
       </div>
