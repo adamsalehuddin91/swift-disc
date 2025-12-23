@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import html2canvas from 'html2canvas';
 import { DISCResult } from '../types';
 import { discProfiles } from '../data/profiles';
 import { getDISCPercentages } from '../utils/scoring';
@@ -12,28 +13,87 @@ interface ResultScreenProps {
 
 export default function ResultScreen({ result, onRestart }: ResultScreenProps) {
   const [showTips, setShowTips] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
   const profile = discProfiles[result.primaryType];
   const percentages = getDISCPercentages(result.scores);
 
-  const handlePrint = () => {
-    window.print();
+  const handleSaveImage = async () => {
+    if (!cardRef.current) return;
+
+    setIsGenerating(true);
+    try {
+      const canvas = await html2canvas(cardRef.current, {
+        backgroundColor: '#1a1a2e',
+        scale: 2,
+        logging: false,
+        useCORS: true,
+      });
+
+      // Convert to blob
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+
+        // Create download link
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `disc-result-${profile.nameBM.toLowerCase().replace(/\s/g, '-')}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        alert('✅ Imej disimpan! Kongsi di WhatsApp/Facebook 🎉');
+      }, 'image/png');
+    } catch (error) {
+      console.error('Error generating image:', error);
+      alert('❌ Maaf, ada masalah. Cuba lagi.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  const handleShare = () => {
-    const text = `Keputusan DISC for Kids:\n${profile.nameBM} ${profile.emoji}\n\nKarakter: ${profile.traitsBM.join(', ')}`;
+  const handleShareImage = async () => {
+    if (!cardRef.current) return;
 
-    if (navigator.share) {
-      navigator.share({
-        title: 'DISC for Kids - Keputusan Saya',
-        text: text,
-      }).catch(() => {
-        // Fallback to copying to clipboard
-        navigator.clipboard.writeText(text);
-        alert('Keputusan disalin! Kongsi dengan kawan & keluarga 🎉');
+    setIsGenerating(true);
+    try {
+      const canvas = await html2canvas(cardRef.current, {
+        backgroundColor: '#1a1a2e',
+        scale: 2,
+        logging: false,
+        useCORS: true,
       });
-    } else {
-      navigator.clipboard.writeText(text);
-      alert('Keputusan disalin! Kongsi dengan kawan & keluarga 🎉');
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) return;
+
+        const file = new File([blob], `disc-${profile.nameBM}.png`, { type: 'image/png' });
+
+        // Try native share API (works on mobile)
+        if (navigator.share && navigator.canShare?.({ files: [file] })) {
+          try {
+            await navigator.share({
+              title: `DISC for Kids - ${profile.nameBM}`,
+              text: `Keputusan DISC saya: ${profile.nameBM} ${profile.emoji}`,
+              files: [file],
+            });
+          } catch (err) {
+            // User cancelled or error - fallback to download
+            handleSaveImage();
+          }
+        } else {
+          // Fallback to download on desktop
+          handleSaveImage();
+        }
+
+        setIsGenerating(false);
+      }, 'image/png');
+    } catch (error) {
+      console.error('Error sharing image:', error);
+      setIsGenerating(false);
+      alert('❌ Maaf, ada masalah. Cuba lagi.');
     }
   };
 
@@ -50,15 +110,16 @@ export default function ResultScreen({ result, onRestart }: ResultScreenProps) {
           </p>
         </div>
 
-        {/* Main Result Card */}
+        {/* Shareable Card - This will be captured as image */}
         <div
-          className="bg-[#1a1a2e] border-4 border-black p-8 mb-6 text-center"
+          ref={cardRef}
+          className="bg-[#1a1a2e] border-4 border-black p-8 mb-6"
           style={{ borderColor: profile.color }}
         >
           {/* Avatar */}
           <div className="flex justify-center mb-6">
             <div
-              className="pixel-avatar bounce"
+              className="pixel-avatar"
               style={{ borderColor: profile.color }}
             >
               <span>{profile.avatar}</span>
@@ -66,19 +127,21 @@ export default function ResultScreen({ result, onRestart }: ResultScreenProps) {
           </div>
 
           {/* Type Name */}
-          <h2 className="text-xl md:text-2xl mb-2" style={{ color: profile.color }}>
-            {profile.emoji} {profile.nameBM}
-          </h2>
-          <p className="text-xs md:text-sm mb-6 leading-relaxed opacity-80">
-            {profile.descriptionBM}
-          </p>
+          <div className="text-center mb-6">
+            <h2 className="text-xl md:text-2xl mb-2" style={{ color: profile.color }}>
+              {profile.emoji} {profile.nameBM}
+            </h2>
+            <p className="text-xs md:text-sm leading-relaxed opacity-80">
+              {profile.descriptionBM}
+            </p>
+          </div>
 
           {/* Traits */}
           <div className="bg-[#16213e] border-2 border-black p-6 mb-6">
-            <h3 className="text-sm md:text-base mb-4 text-[#ffd93d]">
+            <h3 className="text-sm md:text-base mb-4 text-[#ffd93d] text-center">
               ✨ Karakter Kamu
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {profile.traitsBM.map((trait, index) => (
                 <div key={index} className="flex items-start gap-2 text-xs md:text-sm">
                   <span style={{ color: profile.color }}>▶</span>
@@ -89,8 +152,8 @@ export default function ResultScreen({ result, onRestart }: ResultScreenProps) {
           </div>
 
           {/* Score Breakdown */}
-          <div className="bg-[#16213e] border-2 border-black p-6">
-            <h3 className="text-sm md:text-base mb-4 text-[#4ecca3]">
+          <div className="bg-[#16213e] border-2 border-black p-6 mb-4">
+            <h3 className="text-sm md:text-base mb-4 text-[#4ecca3] text-center">
               📊 Pecahan Skor
             </h3>
             <div className="space-y-3">
@@ -113,12 +176,17 @@ export default function ResultScreen({ result, onRestart }: ResultScreenProps) {
                       </div>
                     </div>
                     <div className="w-12 text-xs text-right">
-                      {result.scores[type]}/10
+                      {result.scores[type]}/15
                     </div>
                   </div>
                 );
               })}
             </div>
+          </div>
+
+          {/* Branding */}
+          <div className="text-center text-xs opacity-60">
+            <p>🎮 DISC for Kids - swift-disc.vercel.app</p>
           </div>
         </div>
 
@@ -157,18 +225,20 @@ export default function ResultScreen({ result, onRestart }: ResultScreenProps) {
         </div>
 
         {/* Action Buttons */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 no-print">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <button
-            onClick={handlePrint}
-            className="pixel-btn bg-[#ffd93d] text-xs md:text-sm"
+            onClick={handleSaveImage}
+            disabled={isGenerating}
+            className="pixel-btn bg-[#ffd93d] text-xs md:text-sm disabled:opacity-50"
           >
-            🖨️ Print
+            {isGenerating ? '⏳ Menjana...' : '💾 Simpan Imej'}
           </button>
           <button
-            onClick={handleShare}
-            className="pixel-btn bg-[#ff6b6b] text-xs md:text-sm"
+            onClick={handleShareImage}
+            disabled={isGenerating}
+            className="pixel-btn bg-[#ff6b6b] text-xs md:text-sm disabled:opacity-50"
           >
-            📤 Share
+            {isGenerating ? '⏳ Menjana...' : '📤 Kongsi'}
           </button>
           <button
             onClick={onRestart}

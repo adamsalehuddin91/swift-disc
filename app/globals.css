@@ -237,19 +237,7 @@ body {
   }
 }
 
-/* Print Styles */
-@media print {
-  body {
-    background: white;
-    color: black;
-  }
-
-  .no-print {
-    display: none !important;
-  }
-
-  .pixel-border,
-  .retro-container {
-    box-shadow: none;
-  }
+/* Image export optimizations */
+.pixel-avatar {
+  image-rendering: auto; /* Better quality for screenshots */
 }
